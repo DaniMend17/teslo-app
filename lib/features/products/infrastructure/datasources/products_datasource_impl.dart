@@ -21,14 +21,24 @@ class ProductsDatasourceImpl implements ProductsDatasource {
   }
 
   @override
-  Future<Product> getProductById(String id) {
-    // TODO: implement getProductById
-    throw UnimplementedError();
+  Future<Product> getProductById(String id) async {
+    try {
+      final response = await dio.get('/products/$id');
+      final product = ProductMapper.jsonToEntity(response.data);
+      return product;
+    } on DioException catch (e) {
+      if (e.response!.statusCode == 400) throw ProductNotFounded();
+      throw Exception();
+    } catch (e) {
+      throw Exception();
+    }
   }
 
   @override
-  Future<List<Product>> getProductsByPage({int limit = 10, int offset = 0}) async{
-    final response = await dio.get<List>('/products?limit=$limit&offset=$offset');
+  Future<List<Product>> getProductsByPage(
+      {int limit = 10, int offset = 0}) async {
+    final response =
+        await dio.get<List>('/products?limit=$limit&offset=$offset');
     final List<Product> products = [];
     for (final product in response.data ?? []) {
       products.add(ProductMapper.jsonToEntity(product));
