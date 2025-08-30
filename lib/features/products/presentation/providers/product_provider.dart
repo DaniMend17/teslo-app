@@ -11,6 +11,22 @@ final productProvider = StateNotifierProvider.family
   },
 );
 
+Product _newProduct() {
+  return Product(
+    id: 'new',
+    title: '',
+    price: 0,
+    description: '',
+    slug: '',
+    stock: 0,
+    sizes: [],
+    gender: '',
+    tags: [],
+    images: [],
+    user: null,
+  );
+}
+
 class ProductNotifier extends StateNotifier<ProductState> {
   final ProductsRepository repository;
 
@@ -18,10 +34,15 @@ class ProductNotifier extends StateNotifier<ProductState> {
   //*uno de sus argumentos en el constructor.
   ProductNotifier({required this.repository, required String productId})
       : super(ProductState(id: productId)) {
-    getProductById();
+    loadProduct();
   }
 
-  Future<void> getProductById() async {
+  Future<void> loadProduct() async {
+    if (state.id == 'new') {
+      state = state.copyWith(isLoading: false, product: _newProduct());
+      return;
+    }
+
     final product = await repository.getProductById(state.id);
     state = state.copyWith(
       isLoading: false,

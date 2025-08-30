@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:teslo_shop/features/products/presentation/providers/providers.dart';
 
 import '../../../shared/shared.dart';
 import '../../domain/domain.dart';
-import '../providers/product_provider.dart';
 
 class ProductScreen extends ConsumerWidget {
   final String productId;
   const ProductScreen({super.key, required this.productId});
+
+  void showSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -18,42 +24,58 @@ class ProductScreen extends ConsumerWidget {
     //* uso watch debido al tipo de provider que es autodispose y recordar que independientemente
     //* de que si el provider esta siendo consumido por un read o watch, cualquier de estos sera su
     //* pundo de inicio de vida y por tanto creara automaticamente la instancia de su notifier y su state.
-    final product = ref.watch(productProvider(productId));
+    final productState = ref.watch(productProvider(productId));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Center(child: Text('Edit product')),
-        actions: const [Icon(Icons.camera_alt)],
-      ),
-      body: product.isLoading
-          ? const FullLoadingScreen()
-          : _ProductView(product: product.product!),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        child: const Icon(Icons.save_as_outlined),
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      onVerticalDragDown: (_) => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Center(child: Text('Edit product')),
+          actions: const [Icon(Icons.camera_alt)],
+        ),
+        body: productState.isLoading
+            ? const FullLoadingScreen()
+            : _ProductView(product: productState.product!),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () async {
+            if (productState.product == null) return;
+            final successfullyUpdCrt = await ref
+                .read(productFormProvider(productState.product!).notifier)
+                .onFormSubmmit();
+            if (!context.mounted) return;
+            if (successfullyUpdCrt) {
+              showSnackBar(context, 'Producto/Creado Actualizado');
+            }
+          },
+          child: const Icon(Icons.save_as_outlined),
+        ),
       ),
     );
   }
 }
 
-class _ProductView extends StatelessWidget {
+class _ProductView extends ConsumerWidget {
   final Product product;
 
   const _ProductView({required this.product});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textStyles = Theme.of(context).textTheme;
+
+    final productForm = ref.watch(productFormProvider(product));
 
     return ListView(
       children: [
         SizedBox(
           height: 250,
           width: 600,
-          child: _ImageGallery(images: product.images),
+          child: _ImageGallery(images: productForm.images),
         ),
         const SizedBox(height: 10),
-        Center(child: Text(product.title, style: textStyles.titleSmall)),
+        Center(
+            child: Text(productForm.title.value, style: textStyles.titleSmall)),
         const SizedBox(height: 10),
         _ProductInformation(product: product),
       ],
@@ -67,6 +89,8 @@ class _ProductInformation extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final productForm = ref.watch(productFormProvider(product));
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -77,43 +101,77 @@ class _ProductInformation extends ConsumerWidget {
           CustomProductField(
             isTopField: true,
             label: 'Nombre',
-            initialValue: product.title,
+            initialValue: productForm.title.value,
+            onChanged:
+                ref.read(productFormProvider(product).notifier).onTitleChanged,
+            errorMessage: productForm.title.errorMessage,
           ),
           CustomProductField(
             isTopField: true,
             label: 'Slug',
-            initialValue: product.slug,
+            initialValue: productForm.slug.value,
+            onChanged:
+                ref.read(productFormProvider(product).notifier).onSlugChanged,
+            errorMessage: productForm.slug.errorMessage,
           ),
           CustomProductField(
             isBottomField: true,
             label: 'Precio',
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            initialValue: product.price.toString(),
+            initialValue: productForm.price.value.toString(),
+            onChanged: (value) {
+              return ref
+                  .read(productFormProvider(product).notifier)
+                  .onPriceChanged(
+                      value.isEmpty ? null : double.tryParse(value) ?? -1);
+            },
+            errorMessage: productForm.price.errorMessage,
           ),
           const SizedBox(height: 15),
           const Text('Extras'),
-          _SizeSelector(selectedSizes: product.sizes),
+          _SizeSelector(
+            selectedSizes: productForm.sizes,
+            onSelectionChanged:
+                ref.read(productFormProvider(product).notifier).onSizeChanged,
+          ),
           const SizedBox(height: 5),
-          _GenderSelector(selectedGender: product.gender),
+          _GenderSelector(
+            selectedGender: productForm.gender,
+            onSelectionChanged:
+                ref.read(productFormProvider(product).notifier).onGenderChanged,
+          ),
           const SizedBox(height: 15),
           CustomProductField(
             isTopField: true,
             label: 'Existencias',
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            initialValue: product.stock.toString(),
+            initialValue: productForm.inStock.value.toString(),
+            onChanged: (value) {
+              return ref
+                  .read(productFormProvider(product).notifier)
+                  .onStockChanged(
+                      value.isEmpty ? null : int.tryParse(value) ?? -1);
+            },
+            errorMessage: productForm.inStock.errorMessage,
           ),
           CustomProductField(
             maxLines: 6,
             label: 'Descripción',
             keyboardType: TextInputType.multiline,
-            initialValue: product.description,
+            initialValue: productForm.description,
+            onChanged: ref
+                .read(productFormProvider(product).notifier)
+                .onDescriptionChanged,
           ),
           CustomProductField(
             isBottomField: true,
             maxLines: 2,
             label: 'Tags (Separados por coma)',
             keyboardType: TextInputType.multiline,
-            initialValue: product.tags.join(', '),
+            // initialValue: product.tags.join(', '),
+            initialValue: productForm.tags,
+            onChanged:
+                ref.read(productFormProvider(product).notifier).onTagsChanged,
           ),
           const SizedBox(height: 100),
         ],
@@ -126,10 +184,15 @@ class _SizeSelector extends StatelessWidget {
   final List<String> selectedSizes;
   final List<String> sizes = const ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
 
-  const _SizeSelector({required this.selectedSizes});
+  final void Function(List<String> selectedSizes) onSelectionChanged;
+
+  const _SizeSelector(
+      {required this.selectedSizes, required this.onSelectionChanged});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return SegmentedButton(
       emptySelectionAllowed: true,
       showSelectedIcon: false,
@@ -139,8 +202,12 @@ class _SizeSelector extends StatelessWidget {
             label: Text(size, style: const TextStyle(fontSize: 10)));
       }).toList(),
       selected: Set.from(selectedSizes),
+      // onSelectionChanged: (newSelection) {
+      //   print(newSelection);
+      // },
       onSelectionChanged: (newSelection) {
-        print(newSelection);
+        FocusScope.of(context).unfocus();
+        onSelectionChanged(List.from(newSelection));
       },
       multiSelectionEnabled: true,
     );
@@ -156,7 +223,10 @@ class _GenderSelector extends StatelessWidget {
     Icons.boy,
   ];
 
-  const _GenderSelector({required this.selectedGender});
+  final void Function(String) onSelectionChanged;
+
+  const _GenderSelector(
+      {required this.selectedGender, required this.onSelectionChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -172,8 +242,12 @@ class _GenderSelector extends StatelessWidget {
               label: Text(size, style: const TextStyle(fontSize: 12)));
         }).toList(),
         selected: {selectedGender},
+        // onSelectionChanged: (newSelection) {
+        //   print(newSelection);
+        // },
         onSelectionChanged: (newSelection) {
-          print(newSelection);
+          FocusScope.of(context).unfocus();
+          onSelectionChanged(newSelection.first);
         },
       ),
     );

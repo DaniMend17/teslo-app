@@ -4,17 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/domain.dart';
 import '../presentation.dart';
 
-  //! El provider
-  final productsProvider = StateNotifierProvider<ProductsNotifier, ProductsState>((ref) {
-    
+//! El provider
+final productsProvider = StateNotifierProvider<ProductsNotifier, ProductsState>(
+  (ref) {
     final repository = ref.watch(productsRepositoryProvider);
 
     return ProductsNotifier(productsRepository: repository);
-
-  },);
-
-
-
+  },
+);
 
 //! El notifier
 class ProductsNotifier extends StateNotifier<ProductsState> {
@@ -22,22 +19,22 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
 
   //*Cuando nosotros observemos este provider inmediatemente mandaremos a llamar el método loadNextPage y recuperaremos
   //*los productos.
-  ProductsNotifier({required this.productsRepository}) : super(ProductsState()) {
+  ProductsNotifier({required this.productsRepository})
+      : super(ProductsState()) {
     loadNextPage();
   }
-
 
   //*Recordar que este método esta pensado para un infinite scroll, el cual sera disparado cada que el usuario llegué
   //*a la parte final del scroll y parará hasta obtener todos los productos del repositorio.
   Future<void> loadNextPage() async {
-    
-    if(state.isLoading || state.isLastPage) return;
+    if (state.isLoading || state.isLastPage) return;
 
     state = state.copyWith(isLoading: true);
 
-    final products = await productsRepository.getProductsByPage(limit: state.limit, offset: state.offset);
+    final products = await productsRepository.getProductsByPage(
+        limit: state.limit, offset: state.offset);
 
-    if(products.isEmpty){
+    if (products.isEmpty) {
       state = state.copyWith(
         isLoading: false,
         isLastPage: true,
@@ -50,8 +47,29 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
       offset: state.offset + 10,
       products: [...state.products, ...products],
     );
+  }
 
+  Future<bool> createUpdateProduct(Map<String, dynamic> productLike) async {
+    try {
+      final product = await productsRepository.createUpdateProduct(productLike);
 
+      if (!state.products.any((element) => element.id == product.id)) {
+        state = state.copyWith(
+          products: [...state.products, product],
+        );
+        return true;
+      }
+
+      state = state.copyWith(
+        products: state.products
+            .map((loadedProduct) =>
+                loadedProduct.id == product.id ? product : loadedProduct)
+            .toList(),
+      );
+      return true;
+    } catch (e) {
+      throw Exception();
+    }
   }
 }
 
