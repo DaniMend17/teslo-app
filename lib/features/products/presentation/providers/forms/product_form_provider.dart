@@ -81,6 +81,10 @@ class ProductFormNotifier extends StateNotifier<ProductFormState> {
     ]));
   }
 
+  void updateImages(String path) {
+    state = state.copyWith(images: [...state.images, path]);
+  }
+
   //! Métodos de validaciones de formularios.
   void onTitleChanged(String value) {
     state = state.copyWith(

@@ -14,6 +14,49 @@ class ProductsDatasourceImpl implements ProductsDatasource {
             baseUrl: Environment.apiUrl,
             headers: {'Authorization': 'Bearer $accessToken'}));
 
+
+
+  Future<List<String>> _uploadPhotos(List<String> photos)async {
+    //* Si no hay fotos nuevas photosToUpload se queda vacio [].
+    final photosToUpload = photos.where((photo) => photo.contains('/'),).toList();
+    final photosToIgnore = photos.where((photo) => !photo.contains('/'),).toList();
+
+    //* Si photosToUpload es [] entonces uploadJob  es Future<[]>.
+    final List<Future<String>> uploadJob = photosToUpload.map(
+      (photo) => _uploadFile(photo),
+    ).toList();
+
+    //* Si uploadJob es [] entonces espera la resolución de su future la cual será []. 
+    final newImages = await Future.wait(uploadJob);
+
+    //
+    return [...photosToIgnore, ...newImages];
+  }
+
+  Future<String> _uploadFile(String path) async {
+    try {
+
+      //* De la url de la imagen guardada de manera local en el dispositivo obtengo unicamente el nombre del archivo.
+      final String fileName = path.split('/').last;
+
+      //* Me rotorna un mapa con la llave file la cual contiene un archivo con el nombre de la imagen tomada con la camara o sacada de la galería.
+      final FormData data = FormData.fromMap({
+        'file': MultipartFile.fromFileSync(path, filename: fileName)
+      });
+      
+      //* Subo la imagen a la apirest.
+      final response = await dio.post('/files/product', data: data);
+
+      //*Retorno el nombre de la imagen ya guardada que me devuelve la petición a la api.
+      return response.data['image'];
+
+    } catch (e) {
+      throw Exception();
+    }
+  } 
+
+
+
   @override
   Future<Product> createUpdateProduct(Map<String, dynamic> productLike) async {
     final String? productId = productLike['id'];
@@ -21,6 +64,7 @@ class ProductsDatasourceImpl implements ProductsDatasource {
     final String url = (productId == null) ? '/products' : '/products/$productId';
 
     productLike.remove('id');
+    productLike['images'] = await _uploadPhotos(productLike['images']);
 
     try {
       final response = await dio.request(url,

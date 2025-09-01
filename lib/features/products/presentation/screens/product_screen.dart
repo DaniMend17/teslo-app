@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:teslo_shop/features/products/presentation/providers/providers.dart';
@@ -19,7 +21,7 @@ class ProductScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     //! Si yo hago esto debido a que mi provider es de tipo dispose me marcara un error.
     //! ya que el autodispose elimina el provider cuando nadie lo esta viendo(watch), por tanto
-    //! como read es lectura y no lo observa como tal me marca error.
+    //! como read es lectura y no lo observa como tal me marca error (esto en el caso del método init en StfulWidg).
     // ref.read(productProvider(productId).notifier);
     //* uso watch debido al tipo de provider que es autodispose y recordar que independientemente
     //* de que si el provider esta siendo consumido por un read o watch, cualquier de estos sera su
@@ -36,13 +38,22 @@ class ProductScreen extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.photo_library_outlined),
               onPressed: () async {
-                final photo = await CameraGalleryServiceImpl().selectPhoto();
+                final imagePath =
+                    await CameraGalleryServiceImpl().selectPhoto();
+                if (imagePath == null) return;
+                ref
+                    .read(productFormProvider(productState.product!).notifier)
+                    .updateImages(imagePath);
               },
             ),
             IconButton(
               icon: const Icon(Icons.camera_alt),
               onPressed: () async {
-                final photo = await CameraGalleryServiceImpl().takePhoto();
+                final imagePath = await CameraGalleryServiceImpl().takePhoto();
+                if (imagePath == null) return;
+                ref
+                    .read(productFormProvider(productState.product!).notifier)
+                    .updateImages(imagePath);
               },
             )
           ],
@@ -273,25 +284,34 @@ class _ImageGallery extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (images.isEmpty) {
+      return ClipRRect(
+          borderRadius: const BorderRadius.all(Radius.circular(20)),
+          child: Image.asset('assets/images/no-image.jpg', fit: BoxFit.cover));
+    }
+
     return PageView(
       scrollDirection: Axis.horizontal,
       controller: PageController(viewportFraction: 0.7),
-      children: images.isEmpty
-          ? [
-              ClipRRect(
-                  borderRadius: const BorderRadius.all(Radius.circular(20)),
-                  child: Image.asset('assets/images/no-image.jpg',
-                      fit: BoxFit.cover))
-            ]
-          : images.map((e) {
-              return ClipRRect(
-                borderRadius: const BorderRadius.all(Radius.circular(20)),
-                child: Image.network(
-                  e,
-                  fit: BoxFit.cover,
-                ),
-              );
-            }).toList(),
+      children: images.map((imagePath) {
+        late ImageProvider imageProvider;
+        if (imagePath.startsWith('http')) {
+          imageProvider = NetworkImage(imagePath);
+        } else {
+          imageProvider = FileImage(File(imagePath));
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 5),
+          child: ClipRRect(
+              borderRadius: const BorderRadius.all(Radius.circular(20)),
+              child: FadeInImage(
+                placeholder: const AssetImage('assets/loaders/bottle-loader.gif'),
+                image: imageProvider,
+                fit: BoxFit.cover,
+              )),
+        );
+      }).toList(),
     );
   }
 }
