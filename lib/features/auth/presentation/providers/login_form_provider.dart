@@ -6,6 +6,7 @@ import 'package:teslo_shop/features/shared/infrastructure/inputs/inputs.dart';
 //! 3.StateNotifierProvider - consumido por los widgets.
 final loginFormProvider =
     StateNotifierProvider.autoDispose<LoginFormNotifier, LoginFormState>((ref) {
+    // StateNotifierProvider<LoginFormNotifier, LoginFormState>((ref) {
   final loginUserCallback = ref.watch(authProvider.notifier).loginUser;
   return LoginFormNotifier(loginUserCallback);
 });

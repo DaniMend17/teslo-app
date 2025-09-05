@@ -56,7 +56,7 @@ class _LoginForm extends ConsumerWidget {
     final loginForm = ref.watch(loginFormProvider);
 
     void showSnackBar(BuildContext context, String message) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
     }
@@ -64,8 +64,13 @@ class _LoginForm extends ConsumerWidget {
     ref.listen(
       authProvider,
       (previous, next) {
-        if (next.errorMessage.isEmpty) return;
-        showSnackBar(context, next.errorMessage);
+        if (next.errorMessage.isNotEmpty) {
+          showSnackBar(context, next.errorMessage);
+        }
+        if (next.authStatus == AuthStatus.authenticated) {
+          // ref.invalidate(loginFormProvider);
+          showSnackBar(context, 'Bienvenido ${next.user}');
+        }
       },
     );
 
@@ -90,7 +95,8 @@ class _LoginForm extends ConsumerWidget {
             label: 'Contraseña',
             obscureText: true,
             onChanged: ref.read(loginFormProvider.notifier).onPasswordChanged,
-            onFieldSubmmited: (_) => ref.read(loginFormProvider.notifier).onFormSubmmit(),
+            onFieldSubmmited: (_) =>
+                ref.read(loginFormProvider.notifier).onFormSubmmit(),
             errorMessage:
                 loginForm.isFormPosted ? loginForm.password.errorMessage : null,
           ),

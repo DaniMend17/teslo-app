@@ -1,3 +1,4 @@
+import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/services/key_value_storage_service_impl.dart';
@@ -7,7 +8,6 @@ import '../../infrastructure/infrastructure.dart';
 enum AuthStatus { cheking, authenticated, notAuthenticated }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  
   final AuthRepositoryImpl repository = AuthRepositoryImpl();
   final KeyValueStorageServiceImpl service = KeyValueStorageServiceImpl();
 
@@ -18,7 +18,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepositoryImpl repository;
   final KeyValueStorageServiceImpl service;
 
-  AuthNotifier(this.repository, this.service) : super(AuthState()) {
+  AuthNotifier(this.repository, this.service) : super(const AuthState()) {
     checkAuthStatus();
   }
 
@@ -45,7 +45,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  void registerUser() async {}
+  Future<void> registerUser(String email, String password, String name) async {
+    try {
+      final user = await repository.register(email, password, name);
+      _setLoggedUser(user);
+    } on CustomError catch (e) {
+      // print(e.message);
+      // state = state.copyWith(errorMessage: e.message);
+      logout(e.message);
+    } catch (e) {
+      logout('Erro no controlado');
+    }
+  }
 
   void _setLoggedUser(User user) async {
     await service.setKeyValue('token', user.token);
@@ -69,7 +80,7 @@ class AuthState {
   final User? user;
   final String errorMessage;
 
-  AuthState(
+  const AuthState(
       {this.authStatus = AuthStatus.cheking,
       this.user,
       this.errorMessage = ''});
@@ -85,4 +96,5 @@ class AuthState {
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
+
 }

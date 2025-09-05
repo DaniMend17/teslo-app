@@ -25,8 +25,9 @@ class AppRouterNotifier extends ChangeNotifier {
   AppRouterNotifier(this._authNotifier) {
     _authNotifier.addListener(
       (state) {
-        authStatus = state.authStatus;
+        if (authStatus == state.authStatus) return;
 
+        authStatus = state.authStatus;
       },
     );
   }
@@ -37,5 +38,4 @@ class AppRouterNotifier extends ChangeNotifier {
     _authStatus = value;
     notifyListeners();
   }
-
 }
